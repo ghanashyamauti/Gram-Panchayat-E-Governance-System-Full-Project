@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: gram_postgres
+    environment:
+      POSTGRES_DB: gram_panchayat
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: gram_backend
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gram_panchayat
+      SECRET_KEY: production-secret-key-change-this
+      JWT_SECRET_KEY: jwt-production-secret-change-this
+      DEBUG: "False"
+      CORS_ORIGINS: http://localhost:3000,http://localhost
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+      - certs_data:/app/certificates
+
+  frontend:
+    build: ./frontend
+    container_name: gram_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads_data:
+  certs_data:
